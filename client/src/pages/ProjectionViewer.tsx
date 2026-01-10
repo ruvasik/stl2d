@@ -44,7 +44,9 @@ export default function ProjectionViewer() {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = Buffer.from(arrayBuffer).toString('base64');
+      const bytes = new Uint8Array(arrayBuffer);
+      const binary = bytes.reduce((acc, byte) => acc + String.fromCharCode(byte), '');
+      const base64 = btoa(binary);
 
       uploadMutation.mutate({
         fileData: base64,
