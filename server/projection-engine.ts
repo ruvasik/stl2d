@@ -115,7 +115,8 @@ function extractEdges(mesh: Mesh): Map<string, Edge> {
 }
 
 /**
- * Determine visible edges for a given view
+ * Determine visible edges for a given view (CAD style)
+ * Only shows silhouette edges and boundary edges, not internal edges
  */
 function getVisibleEdges(mesh: Mesh, viewDirection: string): Line2D[] {
   const viewDir = getViewDirection(viewDirection);
@@ -123,22 +124,20 @@ function getVisibleEdges(mesh: Mesh, viewDirection: string): Line2D[] {
   const visibleLines: Line2D[] = [];
 
   for (const edge of Array.from(edgeMap.values())) {
-    // An edge is visible if:
-    // 1. It's on the silhouette (one face front-facing, one back-facing)
-    // 2. Or both adjacent faces are front-facing (shared edge visible from front)
-
     const frontFacingCount = edge.faces.filter((f: Face) => isFrontFacing(f, viewDir)).length;
     const backFacingCount = edge.faces.length - frontFacingCount;
 
     let isVisible = false;
 
     if (edge.faces.length === 1) {
-      // Boundary edge - always visible
-      isVisible = isFrontFacing(edge.faces[0], viewDir);
+      // Boundary edge - visible only if front-facing
+      isVisible = frontFacingCount === 1;
     } else if (edge.faces.length === 2) {
-      // Silhouette edge - visible if one front, one back
+      // Shared edge - visible only if it's a silhouette (one front, one back)
+      // Do NOT show edges between two front-facing faces (internal edges)
       isVisible = frontFacingCount === 1 && backFacingCount === 1;
     }
+    // Edges with more than 2 faces are not shown (non-manifold, should be rare)
 
     if (isVisible) {
       const p0 = project3DTo2D(edge.v0, viewDirection as any);
