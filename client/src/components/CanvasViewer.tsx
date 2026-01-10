@@ -1,12 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import type { ProjectionView } from '@shared/types';
 
-export interface ProjectionView {
-  name: string;
-  lines: Array<[[number, number], [number, number]]>;
-  bbox: [number, number, number, number];
-}
+// Re-export for backward compatibility
+export type { ProjectionView };
 
 interface CanvasViewerProps {
   view: ProjectionView;
@@ -39,14 +37,28 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
   });
 
   // Calculate initial scale to fit bbox in canvas
-  const fitToView = () => {
+  const fitToView = useCallback(() => {
     const [xmin, ymin, xmax, ymax] = view.bbox;
     const bboxWidth = xmax - xmin;
     const bboxHeight = ymax - ymin;
 
+    // Handle edge case: empty or invalid bbox
+    if (bboxWidth <= 0 || bboxHeight <= 0 || !isFinite(bboxWidth) || !isFinite(bboxHeight)) {
+      setViewState((prev) => ({
+        ...prev,
+        scale: 1,
+        offsetX: width / 2,
+        offsetY: height / 2,
+        isDragging: false,
+        dragStartX: 0,
+        dragStartY: 0,
+      }));
+      return;
+    }
+
     const scaleX = (width * 0.9) / bboxWidth;
     const scaleY = (height * 0.9) / bboxHeight;
-    const scale = Math.min(scaleX, scaleY, 100); // Cap at 100x zoom
+    const scale = Math.min(scaleX, scaleY);
 
     const centerX = (xmin + xmax) / 2;
     const centerY = (ymin + ymax) / 2;
@@ -62,7 +74,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
       dragStartX: 0,
       dragStartY: 0,
     });
-  };
+  }, [view.bbox, width, height]);
 
   // Draw canvas
   useEffect(() => {
@@ -123,13 +135,13 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     }
   }, [view, viewState, width, height]);
 
-  // Fit to view on mount
+  // Fit to view on mount or when view changes
   useEffect(() => {
     fitToView();
-  }, [view]);
+  }, [fitToView]);
 
   // Mouse wheel zoom
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLCanvasElement>) => {
     e.preventDefault();
 
     const canvas = canvasRef.current;
@@ -139,69 +151,116 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.1, Math.min(100, viewState.scale * zoomFactor));
+    setViewState((prev) => {
+      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+      const newScale = Math.max(0.1, prev.scale * zoomFactor);
 
-    // Calculate new offset to zoom towards mouse position
-    const worldX = (mouseX - viewState.offsetX) / viewState.scale;
-    const worldY = (mouseY - viewState.offsetY) / viewState.scale;
+      // Calculate new offset to zoom towards mouse position
+      const worldX = (mouseX - prev.offsetX) / prev.scale;
+      const worldY = (mouseY - prev.offsetY) / prev.scale;
 
-    const newOffsetX = mouseX - worldX * newScale;
-    const newOffsetY = mouseY - worldY * newScale;
+      const newOffsetX = mouseX - worldX * newScale;
+      const newOffsetY = mouseY - worldY * newScale;
 
-    setViewState((prev) => ({
-      ...prev,
-      scale: newScale,
-      offsetX: newOffsetX,
-      offsetY: newOffsetY,
-    }));
-  };
+      return {
+        ...prev,
+        scale: newScale,
+        offsetX: newOffsetX,
+        offsetY: newOffsetY,
+      };
+    });
+  }, []);
 
   // Mouse drag pan
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     setViewState((prev) => ({
       ...prev,
       isDragging: true,
       dragStartX: e.clientX,
       dragStartY: e.clientY,
     }));
-  };
+  }, []);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!viewState.isDragging) return;
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    setViewState((prev) => {
+      if (!prev.isDragging) return prev;
 
-    const deltaX = e.clientX - viewState.dragStartX;
-    const deltaY = e.clientY - viewState.dragStartY;
+      const deltaX = e.clientX - prev.dragStartX;
+      const deltaY = e.clientY - prev.dragStartY;
 
-    setViewState((prev) => ({
-      ...prev,
-      offsetX: prev.offsetX + deltaX,
-      offsetY: prev.offsetY + deltaY,
-      dragStartX: e.clientX,
-      dragStartY: e.clientY,
-    }));
-  };
+      return {
+        ...prev,
+        offsetX: prev.offsetX + deltaX,
+        offsetY: prev.offsetY + deltaY,
+        dragStartX: e.clientX,
+        dragStartY: e.clientY,
+      };
+    });
+  }, []);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setViewState((prev) => ({
       ...prev,
       isDragging: false,
     }));
-  };
+  }, []);
 
-  const handleZoomIn = () => {
-    setViewState((prev) => ({
-      ...prev,
-      scale: Math.min(100, prev.scale * 1.2),
-    }));
-  };
+  // Handle mouse up outside canvas (e.g., when dragging outside)
+  useEffect(() => {
+    if (!viewState.isDragging) return;
 
-  const handleZoomOut = () => {
-    setViewState((prev) => ({
-      ...prev,
-      scale: Math.max(0.1, prev.scale / 1.2),
-    }));
-  };
+    const handleWindowMouseUp = () => {
+      setViewState((prev) => ({
+        ...prev,
+        isDragging: false,
+      }));
+    };
+
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    return () => {
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+    };
+  }, [viewState.isDragging]);
+
+  const handleZoomIn = useCallback(() => {
+    setViewState((prev) => {
+      const newScale = prev.scale * 1.2;
+      // Zoom towards center
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const worldX = (centerX - prev.offsetX) / prev.scale;
+      const worldY = (centerY - prev.offsetY) / prev.scale;
+      const newOffsetX = centerX - worldX * newScale;
+      const newOffsetY = centerY - worldY * newScale;
+
+      return {
+        ...prev,
+        scale: newScale,
+        offsetX: newOffsetX,
+        offsetY: newOffsetY,
+      };
+    });
+  }, [width, height]);
+
+  const handleZoomOut = useCallback(() => {
+    setViewState((prev) => {
+      const newScale = Math.max(0.1, prev.scale / 1.2);
+      // Zoom towards center
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const worldX = (centerX - prev.offsetX) / prev.scale;
+      const worldY = (centerY - prev.offsetY) / prev.scale;
+      const newOffsetX = centerX - worldX * newScale;
+      const newOffsetY = centerY - worldY * newScale;
+
+      return {
+        ...prev,
+        scale: newScale,
+        offsetX: newOffsetX,
+        offsetY: newOffsetY,
+      };
+    });
+  }, [width, height]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -211,6 +270,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           variant="outline"
           onClick={handleZoomIn}
           title="Zoom in"
+          aria-label="Zoom in"
         >
           <ZoomIn className="w-4 h-4" />
         </Button>
@@ -219,6 +279,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           variant="outline"
           onClick={handleZoomOut}
           title="Zoom out"
+          aria-label="Zoom out"
         >
           <ZoomOut className="w-4 h-4" />
         </Button>
@@ -227,6 +288,7 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
           variant="outline"
           onClick={fitToView}
           title="Reset view"
+          aria-label="Reset view to fit"
         >
           <RotateCcw className="w-4 h-4" />
         </Button>
@@ -244,6 +306,8 @@ export const CanvasViewer: React.FC<CanvasViewerProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         className="border border-gray-300 rounded cursor-grab active:cursor-grabbing bg-white"
+        role="img"
+        aria-label={`2D projection view: ${view.name}`}
       />
       <div className="text-xs text-gray-500">
         Scroll to zoom • Drag to pan • Click reset to fit view

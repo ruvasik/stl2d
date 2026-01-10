@@ -4,12 +4,7 @@ import { CanvasViewer } from '@/components/CanvasViewer';
 import { Button } from '@/components/ui/button';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
-
-interface ProjectionView {
-  name: string;
-  lines: Array<[[number, number], [number, number]]>;
-  bbox: [number, number, number, number];
-}
+import type { ProjectionView } from '@shared/types';
 
 const viewNames = ['front', 'back', 'left', 'right', 'top', 'bottom'] as const;
 const viewLabels: Record<typeof viewNames[number], string> = {

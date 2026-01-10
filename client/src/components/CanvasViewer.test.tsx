@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CanvasViewer, ProjectionView } from './CanvasViewer';
+import { CanvasViewer } from './CanvasViewer';
+import type { ProjectionView } from '@shared/types';
 
 const mockProjection: ProjectionView = {
   name: 'front',

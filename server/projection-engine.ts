@@ -3,17 +3,15 @@
  */
 
 import { Mesh, Vector3, Face } from './stl-parser';
-
-export interface ProjectionView {
-  name: string;
-  lines: Array<[[number, number], [number, number]]>;
-  bbox: [number, number, number, number]; // [xmin, ymin, xmax, ymax]
-}
+import type { ProjectionView } from '../shared/types';
 
 export interface ProjectionResponse {
   modelId: string;
   views: ProjectionView[];
 }
+
+// Re-export for convenience
+export type { ProjectionView };
 
 interface Edge {
   v0: Vector3;
