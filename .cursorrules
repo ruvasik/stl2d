@@ -1,0 +1,6 @@
+Project rules (English only):
+- Documentation, comments, and inline notes must be in English.
+- Favor clarity and simplicity: follow KISS, DRY, YAGNI; avoid premature optimization.
+- Align structure with FSD (Feature-Sliced Design); place code by feature slice with shared layers clearly separated.
+- Prefer explicitness over magic; name things descriptively.
+- Keep tests/docs updated alongside code changes.
