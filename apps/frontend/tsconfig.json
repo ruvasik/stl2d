@@ -1,0 +1,22 @@
+{
+  "extends": "../../packages/config/tsconfig.react.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@app": ["./src/app"],
+      "@app/*": ["./src/app/*"],
+      "@pages": ["./src/pages"],
+      "@pages/*": ["./src/pages/*"],
+      "@widgets/*": ["./src/widgets/*"],
+      "@features/*": ["./src/features/*"],
+      "@entities/*": ["./src/entities/*"],
+      "@shared": ["./src/shared"],
+      "@shared/*": ["./src/shared/*"],
+      "@stl2d/contracts": ["../../packages/contracts/src"],
+      "@stl2d/contracts/*": ["../../packages/contracts/src/*"]
+    }
+  },
+  "include": ["src/**/*", "../backend/src/routers.ts"],
+  "exclude": ["node_modules", "dist"]
+}
